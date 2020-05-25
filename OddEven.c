@@ -73,7 +73,7 @@ int isCorrect(int *array, int arraySize){
 void doTest(int fullSize, int worldSize){
   float startTime;
   int worldRank;
-  int* arrayToSort[fullSize];
+  int* arrayToSort;
   int size = fullSize / worldSize;
   int *sorted;
   arrayToSort = randomArray(arrayToSort, fullSize);
