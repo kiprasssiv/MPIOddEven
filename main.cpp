@@ -119,7 +119,7 @@ printf("final sorted data:");
          	printf("%d ",data[i] );
          }*/
     printf("\n");
-    printf("ELAPSED TIME: %d/n", t=clocl()-t);
+    printf("ELAPSED TIME: %d/n", t=clock()-t);
 }
 
 ierr = MPI_Finalize();
