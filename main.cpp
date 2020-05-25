@@ -5,31 +5,32 @@
 
 //
 void mpiSort(int worldRank, int subArraySize, int *originalArray, int *sorted){
-  bool sorted = false;
+  int sortedArray = 0;
   int odd = 0;
 
-  while(!=sorted){
+  while(sortedArray == 0){
         //even time
     if(odd == 0){
-            sorted = true;
+            sortedArray = 1;
         for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
             if(originalArray[i]>originalArray[i+1]){
                 int temp = originalArray[i];
                 originalArray[i] = originalArray[i+1];
                 originalArray[i+1] = temp;
-                sorted = false;
+                sortedArray = 0;
             }
         }
         odd = 1;
     }
         //odd time
     else{
+            sortedArray = 1;
         for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
             if(originalArray[i]>originalArray[i+1]){
                 int temp = originalArray[i];
                 originalArray[i] = originalArray[i+1];
                 originalArray[i+1] = temp;
-                sorted = false;
+                sortedArray = 0;
             }
         }
         odd = 0;
@@ -103,6 +104,24 @@ void doTest(int fullSize, int worldSize){
   free(arrayToSort);
   MPI_Barrier(MPI_COMM_WORLD);
 }
+int* randomArray(int *array, int size){
+  int i;
+  array = malloc(size * sizeof(int));
+  srand(time(0));
+
+  for(i = 0; i < size; i++){
+    array[i] = rand() % size;
+  }
+  return array;
+}
+
+void printArray(int *array, int size){
+  int i;
+  for(i = 0; i < size; i++){
+    printf("%d ", array[i]);
+  }
+  printf("\n");
+}
 
 int main(int argc, char** argv) {
   int fullSize = atoi(argv[1]);
@@ -124,23 +143,4 @@ int main(int argc, char** argv) {
   //doTest(60000000, worldSize);
 
   MPI_Finalize();
-}
-
-int* randomArray(int *array, int size){
-  int i;
-  array = malloc(size * sizeof(int));
-  srand(time(0));
-
-  for(i = 0; i < size; i++){
-    array[i] = rand() % size;
-  }
-  return array;
-}
-
-void printArray(int *array, int size){
-  int i;
-  for(i = 0; i < size; i++){
-    printf("%d ", array[i]);
-  }
-  printf("\n");
 }
