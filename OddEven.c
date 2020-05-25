@@ -5,7 +5,7 @@
 
 //
 void mpiSort(int worldRank, int subArraySize, int *originalArray, int *sorted){
-  bool sorted = 0;
+  int sorted = 0;
   int odd = 0;
 
   while(sorted == 0){
