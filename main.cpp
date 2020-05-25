@@ -13,6 +13,7 @@ int main(int argc, char *argv[]){
 
 	int nump,rank;
 	int n,localn;
+	clock_t t;
 	int *data,recdata[100],recdata2[100];
 	int *temp;
 	int ierr,i;
@@ -41,6 +42,7 @@ int main(int argc, char *argv[]){
          	printf("%d ",data[i] );
          }
          printf("\n");
+         t = clock();
     }
     else{
     	data=NULL;
@@ -117,6 +119,7 @@ printf("final sorted data:");
          	printf("%d ",data[i] );
          }
     printf("\n");
+    printf("ELAPSED TIME: %d/n", t=clocl()-t);
 }
 
 ierr = MPI_Finalize();
