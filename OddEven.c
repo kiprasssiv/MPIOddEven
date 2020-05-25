@@ -5,32 +5,32 @@
 
 //
 void mpiSort(int worldRank, int subArraySize, int *originalArray, int *sorted){
-  int sorted = 0;
+  int sortedArray = 0;
   int odd = 0;
 
-  while(sorted == 0){
+  while(sortedArray == 0){
         //even time
     if(odd == 0){
-            sorted = 1;
+            sortedArray = 1;
         for(int i=worldRank*subArraySize;i<worldRank*subArraySize+subArraySize;i+=2){
             if(originalArray[i]>originalArray[i+1]){
                 int temp = originalArray[i];
                 originalArray[i] = originalArray[i+1];
                 originalArray[i+1] = temp;
-                sorted = 2;
+                sortedArray = 2;
             }
         }
         odd = 1;
     }
         //odd time
     else{
-        sorted = 1;
+        sortedArray = 1;
         for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
             if(originalArray[i]>originalArray[i+1]){
                 int temp = originalArray[i];
                 originalArray[i] = originalArray[i+1];
                 originalArray[i+1] = temp;
-                sorted = 0;
+                sortedArray = 0;
             }
         }
         odd = 0;
