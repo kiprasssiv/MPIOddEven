@@ -115,9 +115,9 @@ for (p=0; p<nump-1; p++) {
 ierr=MPI_Gather(recdata,localn,MPI_INT,data,localn,MPI_INT,0,MPI_COMM_WORLD);
 if(rank==root_process){
 printf("final sorted data:");
-         for(i=0;i<n;i++){
+         /*for(i=0;i<n;i++){
          	printf("%d ",data[i] );
-         }
+         }*/
     printf("\n");
     printf("ELAPSED TIME: %d/n", t=clocl()-t);
 }
