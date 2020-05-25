@@ -67,13 +67,13 @@ int main(int argc, char **argv) {
 
     int c;
     int world_rank;
-    int world_size;
+    int worldSize;
 
     int *sorted = NULL;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
 
     //Masyvo sukurimas ir reiksmiu generavimas
     if (world_rank == 0) {
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     }
 
     //Po kiek isdalinamas masyvas
-    int size = n / world_size;
+    int size = n / worldSize;
 
     //Inicializavimas dalinio masyvo
     int *sub_array = malloc(size * sizeof(int));
@@ -111,17 +111,17 @@ int main(int argc, char **argv) {
     if (world_rank == 0) {
         int *arr = malloc(n * sizeof(int));
 
-        lastMerge(sorted, arr, 0, (n - 1), world_size);
+        lastMerge(sorted, arr, 0, (n - 1), worldSize);
 
         //Sustojama skaiciuoti laika
         elapsedTime = clock() - startTime;
 
         //konvertavimas i sekundes
-        double time_taken = ((double) t) / CLOCKS_PER_SEC; // in seconds
+        double elapsedTime = ((double) elapsedTime) / CLOCKS_PER_SEC; // in seconds
 
-        printf("%f seconds.processors %d /n", time_taken, world_size);
+        printf("%f seconds.processors %d /n", elapsedTime, worldSize);
         free(sorted);
-        free(other_array);
+        free(arr);
     }
     free(origin_arr);
     free(sub_array);
