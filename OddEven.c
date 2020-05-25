@@ -4,7 +4,7 @@
 #include <mpi.h>
 int* randomArray(int *array, int size){
   int i;
-  //array = malloc(size * sizeof(int));
+  array = malloc(size * sizeof(int));
   srand(time(0));
 
   for(i = 0; i < size; i++){
