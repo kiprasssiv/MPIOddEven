@@ -4,7 +4,7 @@
 #include <mpi.h>
 int* randomArray(int *array, int size){
   int i;
-  array = malloc(size * sizeof(int));
+  //array = malloc(size * sizeof(int));
   srand(time(0));
 
   for(i = 0; i < size; i++){
@@ -73,7 +73,7 @@ int isCorrect(int *array, int arraySize){
 void doTest(int fullSize, int worldSize){
   float startTime;
   int worldRank;
-  int* arrayToSort;
+  int* arrayToSort[fullSize];
   int size = fullSize / worldSize;
   int *sorted;
   arrayToSort = randomArray(arrayToSort, fullSize);
@@ -96,7 +96,7 @@ void doTest(int fullSize, int worldSize){
   if(worldRank == 0) {
     int *otherArray = malloc(fullSize * sizeof(int));
 
-    finalMergeSort(sorted, otherArray, 0, (fullSize - 1));
+
 
     float timeElapsed = (float)clock() / CLOCKS_PER_SEC - startTime;
 
