@@ -1,150 +1,146 @@
-#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <time.h>
+#include <mpi.h>
 
-#define bool        char
-#define true        1
-#define false       0
-#define channel1    0
-#define channel2    1
+//
+void mpiSort(int worldRank, int subArraySize, int *originalArray, int *sorted){
+  bool sorted = false;
+  int odd = 0;
 
-#define LEFT_PHASE  0
-#define RIGHT_PHASE 1
-
-bool sorted = false;
-int num_procs, rank;
-int size, *nums;
-
-int mpi_commu_basic(int proc, int* target, int* buffer, int channel)
-{
-    if (rank >= num_procs || proc >= num_procs || proc < 0)
-        return -1;
-    MPI_Status status;
-    MPI_Sendrecv(target, 1, MPI_INT, proc, channel,
-                 buffer, 1, MPI_INT, proc, (channel+1)%2,
-                 MPI_COMM_WORLD, &status);
-    return 0;
-}
-
-
-
-void exchage_max(int proc, int* target)
-{
-    int buffer;
-    if (mpi_commu_basic(proc, target, &buffer, channel2))
-        return;
-    if (buffer > *target) {
-        *target = buffer;
-        sorted = false;
-    }
-}
-
-void exchage_min(int proc, int* target)
-{
-    int buffer;
-    if (mpi_commu_basic(proc, target, &buffer, channel1))
-        return;
-    if (*target > buffer){
-        *target = buffer;
-        sorted = false;}
-}
-
-void _single_phase_sort(int* a, int index, int size)
-{
-    for (int i = index; i < size - 1; i += 2){
-        if (a[i] > a[i + 1]) {
-            int temp = a[i];
-            a[i] = a[i + 1];
-            a[i + 1] = temp;
-            sorted = false;
+  while(!=sorted){
+        //even time
+    if(odd == 0){
+            sorted = true;
+        for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
+            if(originalArray[i]>originalArray[i+1]){
+                int temp = originalArray[i];
+                originalArray[i] = originalArray[i+1];
+                originalArray[i+1] = temp;
+                sorted = false;
             }
+        }
+        odd = 1;
     }
+        //odd time
+    else{
+        for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
+            if(originalArray[i]>originalArray[i+1]){
+                int temp = originalArray[i];
+                originalArray[i] = originalArray[i+1];
+                originalArray[i+1] = temp;
+                sorted = false;
+            }
+        }
+        odd = 0;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
+}
+
+int isCorrect(int *array, int arraySize){
+  int i;
+  for(i = 0; i < arraySize - 1; i++){
+    if(array[i] > array[i + 1]){
+      printf("ERROR, sorted not correctly");
+      return 0;
+    }
+  }
+  return 1;
 }
 
 
-int main(int argc, char** argv)
-{
-	int num_procs, rank;
-    MPI_Init(&argc, &argv);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    //dydis masyvo
-    int num = atoi(argv[1]);
-    //sukuriamas array
-	int *array_in = (int *)malloc(sizeof(int)*num);
-	//sukuriama random array
-	for (int i = 0; i < num; i++) {
-		array_in[i] = ((int)rand()) % 1000;
-	}
-
-    //procesoriam isdalina dydi
-    num_procs = num_procs > num ? num : num_procs;
-    size = (num + num_procs - 1) / num_procs;
-
-    int count;
-    nums = malloc(size * sizeof(int));
+void doTest(int fullSize, int worldSize){
+  float startTime;
+  int worldRank;
+  int* arrayToSort;
+  int size = fullSize / worldSize;
+  int *sorted;
+  arrayToSort = randomArray(arrayToSort, fullSize);
+  printArray(arrayToSort, fullSize);
 
 
-    bool single_process = num_procs <= 1 ? true : false;
-    int front = size * rank,
-    tail = front + size - 1;
+  // Initialize MPI
+  MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
 
-    while (!sorted) {
-        sorted = true;
+  if(worldRank == 0) {
+    sorted = malloc(fullSize * sizeof(int));
+  }
 
-        /*** even-phase ***/
-        if (!single_process) {
-            if (rank % 2 == 0 && tail%2 == 0) {
-                exchage_min(rank + 1, &array_in[count - 1]);
-                }
-            if (rank % 2 != 0 && front%2 != 0) {
-                exchage_max(rank - 1, &array_in[0]);
-                }
-            MPI_Barrier(MPI_COMM_WORLD);
-        }
-        _single_phase_sort(nums, 0, count);
+  startTime = (float)clock() / CLOCKS_PER_SEC;
+  mpiSort(worldRank, size, arrayToSort, sorted);
 
-        /*** odd-phase ***/
-        if (!single_process) {
-            if (tail%2!=0){
-                exchage_min(rank + 1, &array_in[count - 1]);
-            }
-            if (front%2==0) {
-                exchage_max(rank - 1, &nums[0]);
-            }
-            MPI_Barrier(MPI_COMM_WORLD);
-        }
-        _single_phase_sort(nums, 1, count);
+  printArray(arrayToSort, fullSize);
 
-        if (!single_process) {
-            bool tmp = sorted;
-            MPI_Allreduce(&tmp, &sorted, 1, MPI_CHAR, MPI_BAND, MPI_COMM_WORLD);
-        }
+  // Make the final mergeSort call
+  if(worldRank == 0) {
+    int *otherArray = malloc(fullSize * sizeof(int));
+
+    finalMergeSort(sorted, otherArray, 0, (fullSize - 1));
+
+    float timeElapsed = (float)clock() / CLOCKS_PER_SEC - startTime;
+
+    char newFilePath[50];
+    sprintf(newFilePath,"zans.txt");
+
+    FILE *fptr = fopen(newFilePath, "a");
+    if(fptr  == NULL){
+      printf("Can't open the file\n");
     }
-    cout<<"Sorted"<<endl;
-    DEBUG("#%d leave sorting-loop(%d)\n", rank, count);
 
+    isCorrect(sorted, fullSize);
+    printArray(sorted, fullSize);
+    fprintf(fptr ,"Num of Proccesses: %i | Size %i | Time %f \n", worldSize, fullSize, timeElapsed);
 
-    free(nums);
+    fclose(fptr);
+    free(sorted);
+    free(otherArray);
+  }
 
-    MPI_Finalize();
+  printf("WorldRank %d\n", worldRank);
+  free(arrayToSort);
+  MPI_Barrier(MPI_COMM_WORLD);
 }
 
-//#define is_odd(x)   ((x) & 1)
-//#define is_even(x)  (!is_odd(x))
-//#define another(x)  ((x + 1) % 2)
-/*int mpi_commu(int proc, int* target, int send_sz, int* buffer, int recv_sz, int channel)
-{
-    if (rank >= num_procs || proc >= num_procs || proc < 0)
-        return -1;
-    MPI_Status status;
-    MPI_Sendrecv(target, send_sz, MPI_INT, proc, channel,
-                 buffer, recv_sz, MPI_INT, proc, another(channel),
-                 MPI_COMM_WORLD, &status);
+int main(int argc, char** argv) {
+  int fullSize = atoi(argv[1]);
+  int print = atoi(argv[2]);
+  int worldSize;
+  //char *fileName;
 
-    int count;
-    MPI_Get_count(&status, MPI_INT, &count);
-    return count;
-}*/
+
+  MPI_Init(NULL, NULL);
+  MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
+  // fileName = getFileName(worldSize);
+
+  //doTest(10000000, worldSize);
+  doTest(10, worldSize);
+  //doTest(20000000, worldSize);
+  //doTest(30000000, worldSize);
+  //doTest(40000000, worldSize);
+  //doTest(50000000, worldSize);
+  //doTest(60000000, worldSize);
+
+  MPI_Finalize();
+}
+
+int* randomArray(int *array, int size){
+  int i;
+  array = malloc(size * sizeof(int));
+  srand(time(0));
+
+  for(i = 0; i < size; i++){
+    array[i] = rand() % size;
+  }
+  return array;
+}
+
+void printArray(int *array, int size){
+  int i;
+  for(i = 0; i < size; i++){
+    printf("%d ", array[i]);
+  }
+  printf("\n");
+}
