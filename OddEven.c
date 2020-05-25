@@ -1,133 +1,121 @@
+#include <iostream>
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 #include <mpi.h>
-#include <stdbool.h>
+#include <stdlib.h>
+#include <algorithm>
+using namespace std;
+int compare (const void * a, const void * b) {
+    return ( *(int*)a > *(int*)b );
+}
 
-void merge(int *a, int *b, int l, int m, int r) {
+int main(int argc, char *argv[]) {
 
-    int h, i, j, k;
-    h = l;
-    i = l;
-    j = m + 1;
+    int nump,rank;
+    int n,localn;
+    int *data,recdata[100],recdata2[100];
+    int *temp;
+    int ierr,i;
+    int root_process;
+    int sendcounts;
+    MPI_Status status;
 
-    while ((h <= m) && (j <= r)) {
-        if (a[h] <= a[j]) {
-            b[i] = a[h];
-            h++;
-        } else {
-            b[i] = a[j];
-            j++;
+    ierr = MPI_Init(&argc, &argv);
+    root_process = 0;
+    ierr = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    ierr = MPI_Comm_size(MPI_COMM_WORLD, &nump);
+
+    if(rank == root_process) {
+        printf("please enter the number of numbers to sort: ");
+        fflush(stdout);
+        scanf("%i", &n);
+        int avgn = n / nump;
+        localn=avgn;
+
+        data=(int*)malloc(sizeof(int)*n);
+        for(i = 0; i < n; i++) {
+            data[i] = rand()%100;
         }
-        i++;
-    }
-
-    if (m < h) {
-        for (k = j; k <= r; k++) {
-            b[i] = a[k];
-            i++;
+        printf("array data is:");
+        for(i=0; i<n; i++) {
+            printf("%d ",data[i] );
         }
+        printf("\n");
     } else {
-        for (k = h; k <= m; k++) {
-            b[i] = a[k];
-            i++;
+        data=NULL;
+    }
+    ierr=MPI_Bcast(&localn,1,MPI_INT,0,MPI_COMM_WORLD);
+    ierr=MPI_Scatter(data, localn, MPI_INT, &recdata, 100, MPI_INT, 0, MPI_COMM_WORLD);
+    printf("%d:received data:",rank);
+    for(i=0; i<localn; i++) {
+        printf("%d ",recdata[i] );
+    }
+    printf("\n");
+    sort(recdata,recdata+localn);
+
+    //begin the odd-even sort
+    int oddrank,evenrank;
+
+    if(rank%2==0) {
+        oddrank=rank-1;
+        evenrank = rank+1;
+    } else {
+        oddrank = rank+1;
+        evenrank = rank-1;
+    }
+    /* Set the ranks of the processors at the end of the linear */
+    if (oddrank == -1 || oddrank == nump)
+        oddrank = MPI_PROC_NULL;
+    if (evenrank == -1 || evenrank == nump)
+        evenrank = MPI_PROC_NULL;
+
+    int p;
+    for (p=0; p<nump-1; p++) {
+        if (p%2 == 1) /* Odd phase */
+            MPI_Sendrecv(recdata, localn, MPI_INT, oddrank, 1, recdata2,
+                         localn, MPI_INT, oddrank, 1, MPI_COMM_WORLD, &status);
+        else /* Even phase */
+            MPI_Sendrecv(recdata, localn, MPI_INT, evenrank, 1, recdata2,
+                         localn, MPI_INT, evenrank, 1, MPI_COMM_WORLD, &status);
+
+//extract localn after sorting the two
+        temp=(int*)malloc(localn*sizeof(int));
+        for(i=0; i<localn; i++) {
+            temp[i]=recdata[i];
         }
-    }
-    for (k = l; k <= r; k++) {
-        a[k] = b[k];
-    }
-}
+        if(status.MPI_SOURCE==MPI_PROC_NULL)
+            continue;
+        else if(rank<status.MPI_SOURCE) {
+            //store the smaller of the two
+            int i,j,k;
+            for(i=j=k=0; k<localn; k++) {
+                if(j==localn||(i<localn && temp[i]<recdata2[j]))
+                    recdata[k]=temp[i++];
+                else
+                    recdata[k]=recdata2[j++];
+            }
+        } else {
+            //store the larger of the two
+            int i,j,k;
+            for(i=j=k=localn-1; k>=0; k--) {
+                if(j==-1||(i>=0 && temp[i]>=recdata2[j]))
+                    recdata[k]=temp[i--];
+                else
+                    recdata[k]=recdata2[j--];
+            }
+        }//else
+    }//for
 
-void mergeSort(int *a, int *b, int l, int r) {
-    int m;
-    if (l < r) {
-        m = (l + r) / 2;
-        mergeSort(a, b, l, m);
-        mergeSort(a, b, (m + 1), r);
-        merge(a, b, l, m, r);
-    }
-}
 
-void lastMerge(int *a, int *b, int l, int r, int depth) {
-    int m;
-    if (l < r && depth > 1) {
-        m = (l + r) / 2;
-        lastMerge(a, b, l, m, depth / 2);
-        lastMerge(a, b, (m + 1), r, depth / 2);
-        merge(a, b, l, m, r);
-    }
-}
 
-int main(int argc, char **argv) {
-
-    int n = 130000000;
-    int *origin_arr = NULL;
-    clock_t startTime;
-    clock_t elapsedTime;
-
-    int c;
-    int world_rank;
-    int worldSize;
-
-    int *sorted = NULL;
-
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
-
-    //Masyvo sukurimas ir reiksmiu generavimas
-    if (world_rank == 0) {
-        origin_arr = malloc(n * sizeof(int));
-        srand(1);
-        for (c = 0; c < n; c++) {
-            int temp = rand();
-            origin_arr[c] = temp;
+    ierr=MPI_Gather(recdata,localn,MPI_INT,data,localn,MPI_INT,0,MPI_COMM_WORLD);
+    if(rank==root_process) {
+        printf("final sorted data:");
+        for(i=0; i<n; i++) {
+            printf("%d ",data[i] );
         }
-
-        //Pradedamas laiko skaiciavimas
-        startTime = clock();
+        printf("\n");
     }
 
-    //Po kiek isdalinamas masyvas
-    int size = n / worldSize;
-
-    //Inicializavimas dalinio masyvo
-    int *sub_array = malloc(size * sizeof(int));
-
-    //Isdalinimas po lygiai
-    MPI_Scatter(origin_arr, size, MPI_INT, sub_array, size, MPI_INT, 0, MPI_COMM_WORLD);
-
-    int *tmp_array = malloc(size * sizeof(int));
-
-    mergeSort(sub_array, tmp_array, 0, (size - 1));
-
-    if (world_rank == 0) {
-        sorted = malloc(n * sizeof(int));
-    }
-    //Masyvu sujungimas
-    MPI_Gather(sub_array, size, MPI_INT, sorted, size, MPI_INT, 0, MPI_COMM_WORLD);
-
-    //Galutinis isrikiavimas
-    if (world_rank == 0) {
-        int *arr = malloc(n * sizeof(int));
-
-        lastMerge(sorted, arr, 0, (n - 1), worldSize);
-
-        //Sustojama skaiciuoti laika
-        elapsedTime = clock() - startTime;
-
-        //konvertavimas i sekundes
-        double elapsedTime = ((double) elapsedTime) / CLOCKS_PER_SEC; // in seconds
-
-        printf("%f seconds.processors %d /n", elapsedTime, worldSize);
-        free(sorted);
-        free(arr);
-    }
-    free(origin_arr);
-    free(sub_array);
-    free(tmp_array);
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
+    ierr = MPI_Finalize();
 
 }
