@@ -2,144 +2,132 @@
 #include <stdlib.h>
 #include <time.h>
 #include <mpi.h>
+#include <stdbool.h>
 
-//
-void mpiSort(int worldRank, int subArraySize, int *originalArray, int *sorted){
-  int sortedArray = 0;
-  int odd = 0;
+void merge(int *a, int *b, int l, int m, int r) {
 
-  while(sortedArray == 0){
-        //even time
-    if(odd == 0){
-            sortedArray = 1;
-        for(int i=worldRank*subArraySize;i<worldRank*subArraySize+subArraySize;i+=2){
-            if(originalArray[i]>originalArray[i+1]){
-                int temp = originalArray[i];
-                originalArray[i] = originalArray[i+1];
-                originalArray[i+1] = temp;
-                sortedArray = 2;
-            }
+    int h, i, j, k;
+    h = l;
+    i = l;
+    j = m + 1;
+
+    while ((h <= m) && (j <= r)) {
+        if (a[h] <= a[j]) {
+            b[i] = a[h];
+            h++;
+        } else {
+            b[i] = a[j];
+            j++;
         }
-        odd = 1;
+        i++;
     }
-        //odd time
-    else{
-        sortedArray = 1;
-        for(int i=worldRank*subArraySize+odd;i<worldRank*subArraySize+subArraySize;i+=2){
-            if(originalArray[i]>originalArray[i+1]){
-                int temp = originalArray[i];
-                originalArray[i] = originalArray[i+1];
-                originalArray[i+1] = temp;
-                sortedArray = 0;
-            }
+
+    if (m < h) {
+        for (k = j; k <= r; k++) {
+            b[i] = a[k];
+            i++;
         }
-        odd = 0;
+    } else {
+        for (k = h; k <= m; k++) {
+            b[i] = a[k];
+            i++;
+        }
     }
+    for (k = l; k <= r; k++) {
+        a[k] = b[k];
+    }
+}
+
+void mergeSort(int *a, int *b, int l, int r) {
+    int m;
+    if (l < r) {
+        m = (l + r) / 2;
+        mergeSort(a, b, l, m);
+        mergeSort(a, b, (m + 1), r);
+        merge(a, b, l, m, r);
+    }
+}
+
+void lastMerge(int *a, int *b, int l, int r, int depth) {
+    int m;
+    if (l < r && depth > 1) {
+        m = (l + r) / 2;
+        lastMerge(a, b, l, m, depth / 2);
+        lastMerge(a, b, (m + 1), r, depth / 2);
+        merge(a, b, l, m, r);
+    }
+}
+
+int main(int argc, char **argv) {
+
+    int n = 130000000;
+    int *origin_arr = NULL;
+    clock_t startTime;
+    clock_t elapsedTime;
+
+    int c;
+    int world_rank;
+    int world_size;
+
+    int *sorted = NULL;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    //Masyvo sukurimas ir reiksmiu generavimas
+    if (world_rank == 0) {
+        origin_arr = malloc(n * sizeof(int));
+        srand(1);
+        for (c = 0; c < n; c++) {
+            int temp = rand();
+            origin_arr[c] = temp;
+        }
+
+        //Pradedamas laiko skaiciavimas
+        startTime = clock();
+    }
+
+    //Po kiek isdalinamas masyvas
+    int size = n / world_size;
+
+    //Inicializavimas dalinio masyvo
+    int *sub_array = malloc(size * sizeof(int));
+
+    //Isdalinimas po lygiai
+    MPI_Scatter(origin_arr, size, MPI_INT, sub_array, size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int *tmp_array = malloc(size * sizeof(int));
+
+    mergeSort(sub_array, tmp_array, 0, (size - 1));
+
+    if (world_rank == 0) {
+        sorted = malloc(n * sizeof(int));
+    }
+    //Masyvu sujungimas
+    MPI_Gather(sub_array, size, MPI_INT, sorted, size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    //Galutinis isrikiavimas
+    if (world_rank == 0) {
+        int *arr = malloc(n * sizeof(int));
+
+        lastMerge(sorted, arr, 0, (n - 1), world_size);
+
+        //Sustojama skaiciuoti laika
+        elapsedTime = clock() - startTime;
+
+        //konvertavimas i sekundes
+        double time_taken = ((double) t) / CLOCKS_PER_SEC; // in seconds
+
+        printf("%f seconds.processors %d /n", time_taken, world_size);
+        free(sorted);
+        free(other_array);
+    }
+    free(origin_arr);
+    free(sub_array);
+    free(tmp_array);
+
     MPI_Barrier(MPI_COMM_WORLD);
-  }
+    MPI_Finalize();
 
-}
-
-int isCorrect(int *array, int arraySize){
-  int i;
-  for(i = 0; i < arraySize - 1; i++){
-    if(array[i] > array[i + 1]){
-      printf("ERROR, sorted not correctly");
-      return 0;
-    }
-  }
-  return 1;
-}
-
-
-
-void doTest(int fullSize, int worldSize){
-  float startTime;
-  int worldRank;
-  int* arrayToSort;
-  int size = fullSize / worldSize;
-  int *sorted;
-  arrayToSort = randomArray(arrayToSort, fullSize);
-  printArray(arrayToSort, fullSize);
-
-
-  // Initialize MPI
-  MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
-
-  if(worldRank == 0) {
-    sorted = malloc(fullSize * sizeof(int));
-  }
-
-  startTime = (float)clock() / CLOCKS_PER_SEC;
-  mpiSort(worldRank, size, arrayToSort, sorted);
-
-  printArray(arrayToSort, fullSize);
-
-  // Make the final mergeSort call
-  /*if(worldRank == 0) {
-    int *otherArray = malloc(fullSize * sizeof(int));
-
-    finalMergeSort(sorted, otherArray, 0, (fullSize - 1));
-
-    float timeElapsed = (float)clock() / CLOCKS_PER_SEC - startTime;
-
-    char newFilePath[50];
-    sprintf(newFilePath,"zans.txt");
-
-    FILE *fptr = fopen(newFilePath, "a");
-    if(fptr  == NULL){
-      printf("Can't open the file\n");
-    }
-
-    isCorrect(sorted, fullSize);
-    printArray(sorted, fullSize);
-    fprintf(fptr ,"Num of Proccesses: %i | Size %i | Time %f \n", worldSize, fullSize, timeElapsed);
-
-    fclose(fptr);
-    free(sorted);
-    free(otherArray);
-  }*/
-
-  printf("WorldRank %d\n", worldRank);
-  free(arrayToSort);
-  MPI_Barrier(MPI_COMM_WORLD);
-}
-
-int main(int argc, char** argv) {
-  int fullSize = atoi(argv[1]);
-  int print = atoi(argv[2]);
-  int worldSize;
-
-
-  MPI_Init(NULL, NULL);
-  MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
-
-  //doTest(10000000, worldSize);
-  doTest(10, worldSize);
-  //doTest(20000000, worldSize);
-  //doTest(30000000, worldSize);
-  //doTest(40000000, worldSize);
-  //doTest(50000000, worldSize);
-  //doTest(60000000, worldSize);
-
-  MPI_Finalize();
-}
-
-int* randomArray(int *array, int size){
-  int i;
-  array = malloc(size * sizeof(int));
-  srand(time(0));
-
-  for(i = 0; i < size; i++){
-    array[i] = rand() % size;
-  }
-  return array;
-}
-
-void printArray(int *array, int size){
-  int i;
-  for(i = 0; i < size; i++){
-    printf("%d ", array[i]);
-  }
-  printf("\n");
 }
